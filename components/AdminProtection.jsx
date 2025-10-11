@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import { Shield, AlertTriangle } from 'lucide-react';
 
 const ADMIN_EMAILS = [
-  'admin@askup.com',
-  'vasux@admin.com', // Add your admin emails here
+  'askupteam396@gmail.com'
 ];
 
 export default function AdminProtection({ children }) {
@@ -53,9 +52,13 @@ export default function AdminProtection({ children }) {
         <div className="max-w-md mx-auto text-center p-8 bg-white rounded-lg shadow-lg">
           <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-4">
             You don't have permission to access the admin panel.
           </p>
+          <div className="bg-gray-100 p-3 rounded mb-4 text-sm">
+            <p className="text-gray-700">Current email: <strong>{session?.user?.email}</strong></p>
+            <p className="text-gray-600 mt-1">Add this email to ADMIN_EMAILS in AdminProtection.jsx</p>
+          </div>
           <button
             onClick={() => router.push('/(main)/dashboard')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

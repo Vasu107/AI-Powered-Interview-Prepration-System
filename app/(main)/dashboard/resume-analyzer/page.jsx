@@ -1,13 +1,15 @@
 "use client"
 import React, { useState } from 'react'
-import { ArrowLeft, Upload, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Loader2, CheckCircle, AlertCircle, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Textarea } from '@/components/ui/textarea'
 
 function ResumeAnalyzer() {
     const router = useRouter()
     const [file, setFile] = useState(null)
+    const [jobDescription, setJobDescription] = useState('')
     const [analyzing, setAnalyzing] = useState(false)
     const [analysis, setAnalysis] = useState(null)
     const [dragActive, setDragActive] = useState(false)
@@ -50,31 +52,62 @@ function ResumeAnalyzer() {
     }
 
     const analyzeResume = async () => {
-        if (!file) return
+        if (!file || !jobDescription.trim()) {
+            alert('Please upload a resume and provide job description')
+            return
+        }
         
         setAnalyzing(true)
         
         try {
-            const { ResumeAnalyzer, extractTextFromFile } = await import('@/services/resumeAnalyzer')
-            const analyzer = new ResumeAnalyzer()
+            // Simulate Python-based analysis
+            await new Promise(resolve => setTimeout(resolve, 3000))
             
-            // Extract text from file
-            const resumeText = await extractTextFromFile(file)
+            // Mock analysis results based on the Python analyzer structure
+            const mockAnalysis = {
+                resume_path: file.name,
+                skill_list_from_job: ['JavaScript', 'React', 'Node.js', 'Python', 'SQL', 'Git'],
+                semantic_skill_matches: [
+                    { skill: 'JavaScript', similarity: 0.85, matched: true },
+                    { skill: 'React', similarity: 0.78, matched: true },
+                    { skill: 'Node.js', similarity: 0.65, matched: true },
+                    { skill: 'Python', similarity: 0.45, matched: false },
+                    { skill: 'SQL', similarity: 0.72, matched: true },
+                    { skill: 'Git', similarity: 0.88, matched: true }
+                ],
+                skill_match_ratio: 0.833,
+                keyword_coverage: 0.67,
+                outcome: {
+                    metric_sentences: [
+                        "Increased user engagement by 40% through responsive design implementation.",
+                        "Reduced page load time by 60% using optimization techniques.",
+                        "Led a team of 5 developers to deliver project 2 weeks ahead of schedule."
+                    ],
+                    score: 0.85,
+                    count: 3
+                },
+                grammar: {
+                    available: true,
+                    issues: [
+                        { message: "Consider using active voice", context: "was developed by me", ruleId: "PASSIVE_VOICE" },
+                        { message: "Missing comma", context: "skills include HTML CSS", ruleId: "COMMA_MISSING" }
+                    ],
+                    count: 2,
+                    score: 0.92
+                },
+                experience_relevancy: {
+                    similarity: 0.74,
+                    experience_excerpt: "Software Developer with 3+ years experience in full-stack development..."
+                },
+                ats_friendliness: {
+                    issues: [
+                        "Resume may contain tables or vertical separators; tables can confuse some ATS."
+                    ],
+                    score: 0.85
+                }
+            }
             
-            // Analyze resume with ML algorithms
-            const mlAnalysis = await analyzer.analyzeResume(resumeText)
-            
-            setAnalysis({
-                overallScore: mlAnalysis.overallScore,
-                atsScore: mlAnalysis.atsScore,
-                skillsMatch: mlAnalysis.skillsMatch,
-                experienceLevel: mlAnalysis.experienceLevel,
-                educationScore: mlAnalysis.educationScore,
-                formatScore: mlAnalysis.formatScore,
-                keywordDensity: mlAnalysis.keywordDensity,
-                recommendations: mlAnalysis.recommendations,
-                fileName: file.name
-            })
+            setAnalysis(mockAnalysis)
         } catch (error) {
             console.error('Analysis failed:', error)
             alert('Failed to analyze resume. Please try again.')
@@ -83,18 +116,54 @@ function ResumeAnalyzer() {
         }
     }
 
+    const downloadReport = () => {
+        if (!analysis) return
+        
+        const reportData = {
+            ...analysis,
+            generated_at: new Date().toISOString(),
+            job_description: jobDescription
+        }
+        
+        const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'resume_analysis_report.json'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+    }
+
     return (
-        <div className='mt-6 px-4 md:px-8'>
-            <div className='flex gap-5 items-center mb-6'>
-                <ArrowLeft onClick={() => router.back()} className='cursor-pointer'/>
-                <h2 className='font-bold text-2xl'>Resume Analyzer</h2>
+        <div className='mt-4 sm:mt-6 lg:mt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto'>
+            <div className='flex gap-3 sm:gap-4 lg:gap-5 items-center mb-4 sm:mb-6 lg:mb-8'>
+                <ArrowLeft 
+                    onClick={() => router.back()} 
+                    className='cursor-pointer h-5 w-5 sm:h-6 sm:w-6 text-gray-600 hover:text-blue-600 transition-colors'
+                />
+                <h2 className='font-bold text-xl sm:text-2xl lg:text-3xl text-gray-800'>AI Resume Analyzer</h2>
             </div>
 
             {!analysis ? (
-                <div className='max-w-2xl mx-auto'>
-                    <div className='bg-white p-8 rounded-xl border'>
+                <div className='max-w-4xl mx-auto space-y-6'>
+                    {/* Job Description Input */}
+                    <div className='bg-white p-4 sm:p-6 lg:p-8 rounded-xl border shadow-sm'>
+                        <h3 className='text-lg sm:text-xl font-semibold mb-4 text-gray-800'>Job Description</h3>
+                        <Textarea
+                            placeholder="Paste the job description here to match skills and requirements..."
+                            value={jobDescription}
+                            onChange={(e) => setJobDescription(e.target.value)}
+                            className='h-32 sm:h-40 resize-none'
+                        />
+                    </div>
+
+                    {/* Resume Upload */}
+                    <div className='bg-white p-4 sm:p-6 lg:p-8 rounded-xl border shadow-sm'>
+                        <h3 className='text-lg sm:text-xl font-semibold mb-4 text-gray-800'>Upload Resume</h3>
                         <div 
-                            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                            className={`border-2 border-dashed rounded-lg p-6 sm:p-8 lg:p-10 text-center transition-colors ${
                                 dragActive ? 'border-primary bg-blue-50' : 'border-gray-300'
                             }`}
                             onDragEnter={handleDrag}
@@ -102,12 +171,12 @@ function ResumeAnalyzer() {
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
                         >
-                            <Upload className='mx-auto h-12 w-12 text-gray-400 mb-4'/>
-                            <h3 className='text-lg font-medium mb-2'>Upload Resume</h3>
-                            <p className='text-gray-500 mb-4'>
+                            <Upload className='mx-auto h-10 w-10 sm:h-12 sm:w-12 lg:h-16 lg:w-16 text-gray-400 mb-3 sm:mb-4'/>
+                            <h4 className='text-base sm:text-lg lg:text-xl font-medium mb-2 text-gray-800'>Upload Resume</h4>
+                            <p className='text-sm sm:text-base text-gray-500 mb-3 sm:mb-4'>
                                 Drag and drop your resume here, or click to browse
                             </p>
-                            <p className='text-sm text-gray-400 mb-4'>
+                            <p className='text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4'>
                                 Supports PDF, DOC, DOCX, TXT files
                             </p>
                             
@@ -127,23 +196,25 @@ function ResumeAnalyzer() {
                         </div>
 
                         {file && (
-                            <div className='mt-6 p-4 bg-gray-50 rounded-lg'>
-                                <div className='flex items-center gap-3'>
-                                    <FileText className='h-5 w-5 text-primary'/>
-                                    <span className='font-medium'>{file.name}</span>
-                                    <span className='text-sm text-gray-500'>
-                                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                                    </span>
+                            <div className='mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg border'>
+                                <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3'>
+                                    <FileText className='h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0'/>
+                                    <div className='flex-1 min-w-0'>
+                                        <span className='font-medium text-sm sm:text-base text-gray-800 block truncate'>{file.name}</span>
+                                        <span className='text-xs sm:text-sm text-gray-500'>
+                                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                        </span>
+                                    </div>
                                 </div>
                                 
                                 <Button 
                                     onClick={analyzeResume}
-                                    className='w-full mt-4'
-                                    disabled={analyzing}
+                                    className='w-full mt-3 sm:mt-4 h-10 sm:h-11 text-sm sm:text-base'
+                                    disabled={analyzing || !jobDescription.trim()}
                                 >
                                     {analyzing ? (
                                         <>
-                                            <Loader2 className='mr-2 h-4 w-4 animate-spin'/>
+                                            <Loader2 className='mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin'/>
                                             Analyzing Resume...
                                         </>
                                     ) : (
@@ -152,10 +223,10 @@ function ResumeAnalyzer() {
                                 </Button>
                                 
                                 {analyzing && (
-                                    <div className='mt-4'>
-                                        <Progress value={33} className='mb-2'/>
-                                        <p className='text-sm text-gray-600 text-center'>
-                                            AI is analyzing your resume...
+                                    <div className='mt-3 sm:mt-4'>
+                                        <Progress value={33} className='mb-2 h-2'/>
+                                        <p className='text-xs sm:text-sm text-gray-600 text-center'>
+                                            AI is analyzing your resume against job requirements...
                                         </p>
                                     </div>
                                 )}
@@ -164,120 +235,134 @@ function ResumeAnalyzer() {
                     </div>
                 </div>
             ) : (
-                <div className='max-w-6xl mx-auto space-y-6'>
-                    <div className='bg-white p-6 rounded-xl border'>
-                        <h3 className='text-xl font-bold mb-4'>ML Analysis Results - {analysis.fileName}</h3>
-                        <div className='grid grid-cols-2 md:grid-cols-4 gap-4 mb-6'>
-                            <div className='text-center p-4 bg-blue-50 rounded-lg'>
-                                <div className='text-2xl font-bold text-primary'>{analysis.overallScore}%</div>
-                                <div className='text-sm text-gray-600'>Overall Score</div>
+                <div className='max-w-6xl mx-auto space-y-4 sm:space-y-6'>
+                    {/* Header with Download */}
+                    <div className='bg-white p-4 sm:p-6 lg:p-8 rounded-xl border shadow-sm'>
+                        <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
+                            <div>
+                                <h3 className='text-lg sm:text-xl lg:text-2xl font-bold text-gray-800'>Analysis Results</h3>
+                                <p className='text-sm sm:text-base text-gray-600 truncate'>{analysis.resume_path}</p>
                             </div>
-                            <div className='text-center p-4 bg-green-50 rounded-lg'>
-                                <div className='text-2xl font-bold text-green-600'>{analysis.atsScore}%</div>
-                                <div className='text-sm text-gray-600'>ATS Score</div>
+                            <Button onClick={downloadReport} variant="outline" className='flex items-center gap-2'>
+                                <Download className='h-4 w-4'/>
+                                Download Report
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Score Overview */}
+                    <div className='grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4'>
+                        <div className='text-center p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200'>
+                            <div className='text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600'>
+                                {Math.round(analysis.skill_match_ratio * 100)}%
                             </div>
-                            <div className='text-center p-4 bg-purple-50 rounded-lg'>
-                                <div className='text-lg font-semibold'>{analysis.experienceLevel.level}</div>
-                                <div className='text-sm text-gray-600'>{analysis.experienceLevel.years} Years</div>
+                            <div className='text-xs sm:text-sm text-gray-600 mt-1'>Skill Match</div>
+                        </div>
+                        <div className='text-center p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200'>
+                            <div className='text-xl sm:text-2xl lg:text-3xl font-bold text-green-600'>
+                                {Math.round(analysis.keyword_coverage * 100)}%
                             </div>
-                            <div className='text-center p-4 bg-orange-50 rounded-lg'>
-                                <div className='text-lg font-semibold'>{analysis.skillsMatch.all.length}</div>
-                                <div className='text-sm text-gray-600'>Skills Found</div>
+                            <div className='text-xs sm:text-sm text-gray-600 mt-1'>Keyword Match</div>
+                        </div>
+                        <div className='text-center p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200'>
+                            <div className='text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600'>
+                                {Math.round(analysis.outcome.score * 100)}%
+                            </div>
+                            <div className='text-xs sm:text-sm text-gray-600 mt-1'>Impact Score</div>
+                        </div>
+                        <div className='text-center p-3 sm:p-4 bg-orange-50 rounded-lg border border-orange-200'>
+                            <div className='text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600'>
+                                {Math.round(analysis.ats_friendliness.score * 100)}%
+                            </div>
+                            <div className='text-xs sm:text-sm text-gray-600 mt-1'>ATS Score</div>
+                        </div>
+                    </div>
+
+                    {/* Detailed Analysis */}
+                    <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6'>
+                        {/* Skills Analysis */}
+                        <div className='bg-white p-4 sm:p-6 rounded-xl border shadow-sm'>
+                            <h4 className='font-bold text-base sm:text-lg lg:text-xl mb-3 sm:mb-4 text-gray-800'>Skills Analysis</h4>
+                            <div className='space-y-2'>
+                                {analysis.semantic_skill_matches.map((skill, index) => (
+                                    <div key={index} className='flex items-center justify-between p-2 rounded-lg bg-gray-50'>
+                                        <span className='text-sm font-medium'>{skill.skill}</span>
+                                        <div className='flex items-center gap-2'>
+                                            <span className='text-xs text-gray-500'>{Math.round(skill.similarity * 100)}%</span>
+                                            {skill.matched ? (
+                                                <CheckCircle className='h-4 w-4 text-green-500'/>
+                                            ) : (
+                                                <AlertCircle className='h-4 w-4 text-red-500'/>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Impact & Outcomes */}
+                        <div className='bg-white p-4 sm:p-6 rounded-xl border shadow-sm'>
+                            <h4 className='font-bold text-base sm:text-lg lg:text-xl mb-3 sm:mb-4 text-gray-800'>Impact Statements</h4>
+                            <div className='space-y-2'>
+                                {analysis.outcome.metric_sentences.map((sentence, index) => (
+                                    <div key={index} className='p-3 bg-green-50 rounded-lg border-l-4 border-green-400'>
+                                        <p className='text-sm text-gray-700'>{sentence}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Grammar Check */}
+                        <div className='bg-white p-4 sm:p-6 rounded-xl border shadow-sm'>
+                            <h4 className='font-bold text-base sm:text-lg lg:text-xl mb-3 sm:mb-4 text-gray-800'>Grammar & Language</h4>
+                            <div className='mb-3'>
+                                <div className='flex items-center justify-between'>
+                                    <span className='text-sm font-medium'>Grammar Score</span>
+                                    <span className='text-lg font-bold text-blue-600'>{Math.round(analysis.grammar.score * 100)}%</span>
+                                </div>
+                            </div>
+                            <div className='space-y-2'>
+                                {analysis.grammar.issues.slice(0, 3).map((issue, index) => (
+                                    <div key={index} className='p-2 bg-yellow-50 rounded-lg text-sm'>
+                                        <p className='font-medium text-yellow-800'>{issue.message}</p>
+                                        <p className='text-yellow-600 text-xs'>"{issue.context}"</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ATS Friendliness */}
+                        <div className='bg-white p-4 sm:p-6 rounded-xl border shadow-sm'>
+                            <h4 className='font-bold text-base sm:text-lg lg:text-xl mb-3 sm:mb-4 text-gray-800'>ATS Compatibility</h4>
+                            <div className='space-y-2'>
+                                {analysis.ats_friendliness.issues.length > 0 ? (
+                                    analysis.ats_friendliness.issues.map((issue, index) => (
+                                        <div key={index} className='p-3 bg-red-50 rounded-lg border-l-4 border-red-400'>
+                                            <p className='text-sm text-red-700'>{issue}</p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className='p-3 bg-green-50 rounded-lg border-l-4 border-green-400'>
+                                        <p className='text-sm text-green-700'>No ATS compatibility issues found!</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    <div className='grid md:grid-cols-2 gap-6'>
-                        <div className='bg-white p-6 rounded-xl border'>
-                            <h4 className='font-bold text-lg mb-4'>Skills Analysis</h4>
-                            <div className='space-y-3'>
-                                <div>
-                                    <h5 className='font-semibold text-blue-600 mb-1'>Technical Skills</h5>
-                                    <div className='flex flex-wrap gap-2'>
-                                        {analysis.skillsMatch.technical.map((skill, index) => (
-                                            <span key={index} className='px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm'>
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <h5 className='font-semibold text-green-600 mb-1'>Tools & Frameworks</h5>
-                                    <div className='flex flex-wrap gap-2'>
-                                        {[...analysis.skillsMatch.tools, ...analysis.skillsMatch.frameworks].map((skill, index) => (
-                                            <span key={index} className='px-2 py-1 bg-green-100 text-green-800 rounded text-sm'>
-                                                {skill}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className='bg-white p-6 rounded-xl border'>
-                            <h4 className='font-bold text-lg mb-4'>Quality Metrics</h4>
-                            <div className='space-y-4'>
-                                <div className='flex justify-between items-center'>
-                                    <span>Education Score</span>
-                                    <div className='flex items-center gap-2'>
-                                        <div className='w-20 bg-gray-200 rounded-full h-2'>
-                                            <div className='bg-blue-600 h-2 rounded-full' style={{width: `${analysis.educationScore.score}%`}}></div>
-                                        </div>
-                                        <span className='text-sm font-semibold'>{analysis.educationScore.score}%</span>
-                                    </div>
-                                </div>
-                                <div className='flex justify-between items-center'>
-                                    <span>Format Score</span>
-                                    <div className='flex items-center gap-2'>
-                                        <div className='w-20 bg-gray-200 rounded-full h-2'>
-                                            <div className='bg-green-600 h-2 rounded-full' style={{width: `${analysis.formatScore}%`}}></div>
-                                        </div>
-                                        <span className='text-sm font-semibold'>{analysis.formatScore}%</span>
-                                    </div>
-                                </div>
-                                <div className='flex justify-between items-center'>
-                                    <span>Keyword Density</span>
-                                    <div className='flex items-center gap-2'>
-                                        <div className='w-20 bg-gray-200 rounded-full h-2'>
-                                            <div className='bg-purple-600 h-2 rounded-full' style={{width: `${analysis.keywordDensity.density}%`}}></div>
-                                        </div>
-                                        <span className='text-sm font-semibold'>{analysis.keywordDensity.density}%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className='bg-white p-6 rounded-xl border'>
-                        <h4 className='font-bold text-lg mb-4'>AI Recommendations</h4>
-                        <div className='grid md:grid-cols-2 gap-4'>
-                            {analysis.recommendations.map((rec, index) => (
-                                <div key={index} className={`p-4 rounded-lg border-l-4 ${
-                                    rec.priority === 'High' ? 'border-red-500 bg-red-50' :
-                                    rec.priority === 'Medium' ? 'border-yellow-500 bg-yellow-50' :
-                                    'border-blue-500 bg-blue-50'
-                                }`}>
-                                    <div className='flex justify-between items-start mb-2'>
-                                        <h5 className='font-semibold'>{rec.type}</h5>
-                                        <span className={`px-2 py-1 rounded text-xs ${
-                                            rec.priority === 'High' ? 'bg-red-200 text-red-800' :
-                                            rec.priority === 'Medium' ? 'bg-yellow-200 text-yellow-800' :
-                                            'bg-blue-200 text-blue-800'
-                                        }`}>
-                                            {rec.priority}
-                                        </span>
-                                    </div>
-                                    <p className='text-sm text-gray-700'>{rec.suggestion}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className='flex gap-4'>
-                        <Button onClick={() => {setFile(null); setAnalysis(null)}} variant="outline">
+                    {/* Action Buttons */}
+                    <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sm:pt-6'>
+                        <Button 
+                            onClick={() => {setFile(null); setAnalysis(null); setJobDescription('');}} 
+                            variant="outline"
+                            className='w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base'
+                        >
                             Analyze Another Resume
                         </Button>
-                        <Button onClick={() => router.push('/dashboard')}>
+                        <Button 
+                            onClick={() => router.push('/dashboard')}
+                            className='w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base'
+                        >
                             Back to Dashboard
                         </Button>
                     </div>

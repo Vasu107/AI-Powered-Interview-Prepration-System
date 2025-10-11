@@ -5,9 +5,9 @@ import LatestInterviewsList from './_components/LatestInterviewsList'
 
 function Dashboard() {
     return(
-        <div>
+        <div className='space-y-4 sm:space-y-6'>
             <WelcomeContainer />
-            <h2 className='my-3 font-bold text-2xl'>Dashboard</h2>
+            <h2 className='my-3 font-bold text-xl sm:text-2xl lg:text-3xl'>Dashboard</h2>
             <CreateOptions />
             <LatestInterviewsList />
         </div>

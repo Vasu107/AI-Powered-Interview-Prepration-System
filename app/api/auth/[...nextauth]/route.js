@@ -47,12 +47,31 @@ const handler = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account.provider === 'google' || account.provider === 'github') {
+        try {
+          await client.connect()
+          const db = client.db('AskUp_Virtual_Interview')
+          
+          const existingUser = await db.collection('users').findOne({ email: user.email })
+          if (!existingUser) {
+            await db.collection('users').insertOne({
+              name: user.name,
+              email: user.email,
+              password: '', // OAuth users don't need password
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+          }
+        } catch (error) {
+          console.error('Error creating user:', error)
+        }
+      }
+      return true
+    },
     async redirect({ url, baseUrl }) {
-      // Handle relative URLs
       if (url.startsWith('/')) return `${baseUrl}${url}`
-      // Handle same origin URLs
       if (new URL(url).origin === baseUrl) return url
-      // Default redirect to dashboard
       return `${baseUrl}/dashboard`
     },
     async session({ session, token }) {

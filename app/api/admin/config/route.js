@@ -1,66 +1,60 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '@/lib/mongodb';
-import AdminConfig from '@/app/Models/AdminConfig';
-import { getServerSession } from 'next-auth';
+import { MongoClient } from 'mongodb';
 
-const ADMIN_EMAILS = ['admin@askup.com', 'vasux@admin.com'];
+const client = new MongoClient(process.env.MONGO_URI);
+const ADMIN_EMAILS = ['askupteam396@gmail.com'];
 
-async function checkAdminAccess() {
-  const session = await getServerSession();
-  return session && ADMIN_EMAILS.includes(session.user?.email);
-}
+
 
 export async function GET() {
   try {
-    const isAdmin = await checkAdminAccess();
-    if (!isAdmin) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
-    }
+    await client.connect();
+    const db = client.db('AskUp_Virtual_Interview');
     
-    await connectDB();
-    
-    let config = await AdminConfig.findOne();
+    let config = await db.collection('config').findOne({ type: 'interview' });
     
     if (!config) {
-      config = new AdminConfig({
-        jobPositions: ['Software Engineer', 'Product Manager', 'Data Scientist', 'UI/UX Designer'],
-        programmingLanguages: ['JavaScript', 'Python', 'Java', 'C++', 'React'],
-        questionCounts: ['3', '5', '7', '10'],
-        durations: ['5 Min', '15 Min', '30 Min', '45 Min', '60 Min'],
-        interviewTypes: ['Technical', 'Behavioral', 'System Design', 'Coding']
-      });
-      await config.save();
+      const defaultConfig = {
+        type: 'interview',
+        jobPositions: ['Frontend Developer', 'Backend Developer', 'Full Stack Developer', 'DevOps Engineer', 'Data Scientist'],
+        jobExperience: ['0-1 years', '1-3 years', '3-5 years', '5-10 years', '10+ years'],
+        questionCounts: [5, 10, 15, 20, 25],
+        durations: ['15 minutes', '30 minutes', '45 minutes', '60 minutes'],
+        interviewTypes: ['Technical', 'Behavioral', 'System Design', 'Coding', 'Mixed'],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await db.collection('config').insertOne(defaultConfig);
+      return NextResponse.json({ config: defaultConfig });
     }
     
-    return NextResponse.json({ success: true, config });
+    return NextResponse.json({ config });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(request) {
   try {
-    const isAdmin = await checkAdminAccess();
-    if (!isAdmin) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
-    }
+    await client.connect();
+    const db = client.db('AskUp_Virtual_Interview');
+    const { config } = await request.json();
     
-    await connectDB();
-    const data = await request.json();
+    await db.collection('config').updateOne(
+      { type: 'interview' },
+      { 
+        $set: { 
+          ...config,
+          type: 'interview',
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
     
-    let config = await AdminConfig.findOne();
-    
-    if (config) {
-      Object.assign(config, data);
-      config.updatedAt = new Date();
-    } else {
-      config = new AdminConfig(data);
-    }
-    
-    await config.save();
-    
-    return NextResponse.json({ success: true, config });
+    return NextResponse.json({ message: 'Configuration updated successfully' });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

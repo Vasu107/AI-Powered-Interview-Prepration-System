@@ -93,13 +93,13 @@ const AIAvatar = ({ currentQuestion, onSpeechComplete, isListening = false }) =>
       {/* AI Avatar */}
       <div className="relative mb-6">
         <div className={`w-40 h-40 rounded-full ${getAvatarColor()} ${getAvatarAnimation()} flex items-center justify-center shadow-lg transition-all duration-300 p-4`}>
-          <div className="w-50 h-50 bg-white rounded-full flex items-center justify-center shadow-inner">
-            <div className="text-6xl"><Image
-              src="/Avatar.png"
-              alt="Avatar"
-              width={200}
+          <div className="w-30 h-30 bg-white rounded-full flex items-center justify-center shadow-inner">
+            <div className="text-3xl"><Image
+              src="/robot.png"
+              alt="Robot"
+              width={100}
               height={100}
-              className="w-[150px]"
+              className="w-[300px]"
             />
             </div>
           </div>

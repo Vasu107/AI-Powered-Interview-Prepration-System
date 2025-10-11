@@ -16,11 +16,6 @@ export const SideBarOptions=[
         icon:WalletCards,
         path:'/dashboard/resume-analyzer'
     },
-    {
-        name:'Coding Round',
-        icon:Code,
-        path:'/dashboard/coding-round'
-    },
 ]
 
 export const interviewType = [

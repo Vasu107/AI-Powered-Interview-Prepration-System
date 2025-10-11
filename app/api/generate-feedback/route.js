@@ -1,114 +1,113 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_KEY?.startsWith('sk-or-') ? 'https://openrouter.ai/api/v1' : undefined,
-});
 
 export async function POST(request) {
-  try {
-    const { answers, jobPosition, language } = await request.json();
+    try {
+        const { answers, jobPosition, language } = await request.json();
 
-    if (!answers || answers.length === 0) {
-      return NextResponse.json({ error: 'No answers provided' }, { status: 400 });
+        if (!answers || !Array.isArray(answers)) {
+            return NextResponse.json({ error: 'Invalid answers data' }, { status: 400 });
+        }
+
+        // Generate AI feedback based on answers
+        const feedback = generateFeedback(answers, jobPosition, language);
+
+        return NextResponse.json({ 
+            success: true, 
+            feedback 
+        });
+
+    } catch (error) {
+        console.error('Feedback generation error:', error);
+        return NextResponse.json({ 
+            error: 'Failed to generate feedback' 
+        }, { status: 500 });
     }
+}
 
-    // Generate feedback based on performance metrics
+function generateFeedback(answers, jobPosition, language) {
     const totalQuestions = answers.length;
     const answeredQuestions = answers.filter(a => a.userAnswer && !a.userAnswer.includes('[TIMEOUT')).length;
     const timedOutQuestions = answers.filter(a => a.timedOut).length;
-    const avgTime = answers.reduce((sum, a) => sum + a.timeTaken, 0) / answers.length;
+    const avgTime = answers.length > 0 ? 
+        answers.reduce((sum, a) => sum + a.timeTaken, 0) / answers.length : 0;
+    const quickResponses = answers.filter(a => a.timeTaken < 30 && !a.timedOut).length;
+    
     const completionRate = (answeredQuestions / totalQuestions) * 100;
-
-    let overallAssessment, strengths, improvements, recommendations, score;
-
-    if (completionRate >= 90 && avgTime < 60) {
-      score = 9;
-      overallAssessment = "Excellent performance! You demonstrated strong technical knowledge and efficient problem-solving skills.";
-      strengths = [
-        "Quick response times showing good preparation",
-        "High completion rate demonstrates thorough understanding",
-        "Consistent performance across all questions"
-      ];
-      improvements = [
-        "Continue practicing advanced concepts",
-        "Explore edge cases in your solutions"
-      ];
-      recommendations = [
-        "Consider taking on more complex technical challenges",
-        "Share your knowledge through mentoring or technical writing"
-      ];
-    } else if (completionRate >= 70 && avgTime < 90) {
-      score = 7;
-      overallAssessment = "Good performance with room for improvement. You show solid understanding of core concepts.";
-      strengths = [
-        "Completed most questions successfully",
-        "Reasonable response times",
-        "Shows understanding of fundamental concepts"
-      ];
-      improvements = [
-        "Work on explaining solutions more clearly",
-        "Practice time management for complex problems"
-      ];
-      recommendations = [
-        "Review areas where you took longer to respond",
-        "Practice more coding problems daily"
-      ];
+    
+    // Generate overall assessment
+    let overallAssessment = '';
+    if (completionRate >= 90) {
+        overallAssessment = `Excellent performance! You demonstrated strong ${language} knowledge and completed ${completionRate.toFixed(0)}% of the interview questions. Your responses show good understanding of the concepts.`;
+    } else if (completionRate >= 70) {
+        overallAssessment = `Good performance overall. You completed ${completionRate.toFixed(0)}% of the questions with reasonable accuracy. There's room for improvement in some areas.`;
     } else if (completionRate >= 50) {
-      score = 5;
-      overallAssessment = "Average performance. Focus on strengthening your technical foundation and practice more.";
-      strengths = [
-        "Attempted all questions",
-        "Shows basic understanding"
-      ];
-      improvements = [
-        "Study core concepts more thoroughly",
-        "Improve response speed",
-        "Practice explaining technical concepts clearly"
-      ];
-      recommendations = [
-        "Dedicate more time to studying fundamentals",
-        "Take practice interviews regularly",
-        "Join coding practice groups or platforms"
-      ];
+        overallAssessment = `Average performance. You completed ${completionRate.toFixed(0)}% of the questions. Focus on improving your ${language} fundamentals and practice more technical concepts.`;
     } else {
-      score = 3;
-      overallAssessment = "Needs significant improvement. Focus on building stronger technical foundations.";
-      strengths = [
-        "Participated in the interview process",
-        "Shows willingness to learn"
-      ];
-      improvements = [
-        "Study fundamental concepts extensively",
-        "Improve time management skills",
-        "Practice basic problem-solving techniques"
-      ];
-      recommendations = [
-        "Start with beginner-level courses and tutorials",
-        "Practice daily coding exercises",
-        "Seek mentorship or additional training"
-      ];
+        overallAssessment = `Your performance indicates significant room for improvement. Consider reviewing ${language} basics and practicing more before your next interview.`;
     }
 
-    // Add specific feedback based on timeout issues
+    // Generate strengths
+    const strengths = [];
+    if (quickResponses > totalQuestions * 0.3) {
+        strengths.push('Quick thinking and fast response times');
+    }
+    if (completionRate >= 80) {
+        strengths.push('High completion rate shows good preparation');
+    }
+    if (avgTime < 60) {
+        strengths.push('Efficient time management during responses');
+    }
+    if (timedOutQuestions === 0) {
+        strengths.push('No timeouts - good time awareness');
+    }
+    if (strengths.length === 0) {
+        strengths.push('Attempted all questions despite challenges');
+    }
+
+    // Generate improvements
+    const improvements = [];
     if (timedOutQuestions > 0) {
-      improvements.push(`Address time management - ${timedOutQuestions} questions timed out`);
-      recommendations.push("Practice solving problems under time pressure");
+        improvements.push(`${timedOutQuestions} questions timed out - work on time management`);
+    }
+    if (avgTime > 90) {
+        improvements.push('Response time could be improved - practice explaining concepts concisely');
+    }
+    if (completionRate < 70) {
+        improvements.push(`Study ${language} fundamentals more thoroughly`);
+    }
+    if (quickResponses < totalQuestions * 0.2) {
+        improvements.push('Practice solving problems faster to build confidence');
     }
 
-    return NextResponse.json({
-      feedback: {
+    // Generate recommendations
+    const recommendations = [];
+    recommendations.push(`Practice more ${language} coding problems daily`);
+    recommendations.push('Review fundamental concepts and data structures');
+    recommendations.push('Practice explaining solutions clearly and concisely');
+    
+    if (jobPosition) {
+        recommendations.push(`Study ${jobPosition}-specific ${language} patterns and best practices`);
+    }
+    
+    if (avgTime > 60) {
+        recommendations.push('Practice timed coding sessions to improve speed');
+    }
+
+    // Calculate score
+    let score = Math.round((completionRate / 100) * 10);
+    if (avgTime < 45) score += 1;
+    if (timedOutQuestions === 0) score += 1;
+    score = Math.min(10, Math.max(1, score));
+
+    return {
         overallAssessment,
         strengths,
         improvements,
         recommendations,
-        score
-      }
-    });
-
-  } catch (error) {
-    console.error('Feedback generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate feedback' }, { status: 500 });
-  }
+        score,
+        completionRate: Math.round(completionRate),
+        avgResponseTime: Math.round(avgTime),
+        questionsAnswered: answeredQuestions,
+        totalQuestions
+    };
 }

@@ -13,16 +13,16 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-function FormContainer({onHandleInputChange, GoToNext}) {
+function FormContainer({onHandleInputChange, GoToNext, initialData = {}}) {
 
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [formData, setFormData] = useState({
-        jobPosition: '',
-        jobExperience: '',
-        jobDescription: '',
-        language: '',
-        questionCount: '',
-        Duration: ''
+        jobPosition: initialData.jobPosition || '',
+        jobExperience: initialData.jobExperience || '',
+        jobDescription: initialData.jobDescription || '',
+        language: initialData.language || '',
+        questionCount: initialData.questionCount || '',
+        Duration: initialData.Duration || ''
     });
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [adminConfig, setAdminConfig] = useState({
@@ -136,6 +136,17 @@ function FormContainer({onHandleInputChange, GoToNext}) {
             onHandleInputChange('type', selectedTypes)
         }
     }, [selectedTypes])
+
+    useEffect(() => {
+        // Initialize form data with initial values only once
+        if (Object.keys(initialData).length > 0) {
+            Object.keys(initialData).forEach(key => {
+                if (initialData[key] && !formData[key]) {
+                    handleFieldChange(key, initialData[key]);
+                }
+            });
+        }
+    }, []);
 
     const handleFieldChange = (fieldId, value) => {
         setFormData(prev => ({ ...prev, [fieldId]: value }));
@@ -253,7 +264,7 @@ function FormContainer({onHandleInputChange, GoToNext}) {
                 return (
                     <Textarea 
                         placeholder={field.placeholder}
-                        className={`${field.height || 'h-[100px]'} mt-2`}
+                        className={`${field.height || 'h-[100px] w-full'} mt-2`}
                         value={formData[field.id]}
                         onChange={(e) => handleFieldChange(field.id, e.target.value)}
                     />
@@ -279,11 +290,10 @@ function FormContainer({onHandleInputChange, GoToNext}) {
                         <h2 className='text-sm font-medium'>{field.label}</h2>
                         {field.hasAI && (
                             <Button
-                                variant="outline"
                                 size="sm"
                                 onClick={generateAIJobDescription}
                                 disabled={!formData.jobPosition || !formData.jobExperience || isGeneratingAI}
-                                className='text-xs'
+                                className='text-xs bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 disabled:bg-gray-400'
                             >
                                 {isGeneratingAI ? (
                                     <>
@@ -320,7 +330,7 @@ function FormContainer({onHandleInputChange, GoToNext}) {
                 </div>                
             </div>
             <div className='mt-7 flex justify-end'>
-                <Button onClick={handleGenerateQuestions}>
+                <Button onClick={handleGenerateQuestions} className='bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90'>
                     Generate Question <ArrowRight />
                 </Button>
             </div>

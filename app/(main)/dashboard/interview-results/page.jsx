@@ -13,6 +13,23 @@ function InterviewResults() {
     const [feedbackError, setFeedbackError] = useState(null);
 
     useEffect(() => {
+        // Turn off camera when feedback page loads
+        const turnOffCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                if (stream) {
+                    stream.getTracks().forEach(track => {
+                        track.stop();
+                    });
+                }
+            } catch (error) {
+                // Camera already off or not accessible
+                console.log('Camera already off or not accessible');
+            }
+        };
+        
+        turnOffCamera();
+        
         const storedResults = localStorage.getItem('interviewResults');
         if (storedResults) {
             const data = JSON.parse(storedResults);
@@ -33,6 +50,12 @@ function InterviewResults() {
             answers.reduce((sum, a) => sum + a.timeTaken, 0) / answers.length : 0;
         const quickResponses = answers.filter(a => a.timeTaken < 30 && !a.timedOut).length;
         const slowResponses = answers.filter(a => a.timeTaken > 96 && !a.timedOut).length;
+        
+        // Calculate scoring statistics
+        const totalScore = answers.reduce((sum, a) => sum + (a.score || 0), 0);
+        const maxPossibleScore = totalQuestions * 10;
+        const scorePercentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+        const avgScore = answers.length > 0 ? (totalScore / answers.length).toFixed(1) : 0;
 
         setStats({
             totalQuestions,
@@ -41,14 +64,19 @@ function InterviewResults() {
             avgTime: Math.round(avgTime),
             quickResponses,
             slowResponses,
-            completionRate: Math.round((answeredQuestions / totalQuestions) * 100)
+            completionRate: Math.round((answeredQuestions / totalQuestions) * 100),
+            totalScore,
+            maxPossibleScore,
+            scorePercentage,
+            avgScore
         });
     };
 
     const getPerformanceLevel = () => {
-        if (stats.completionRate >= 90 && stats.avgTime < 60) return { level: 'Excellent', color: 'text-green-600', icon: Trophy };
-        if (stats.completionRate >= 70 && stats.avgTime < 90) return { level: 'Good', color: 'text-blue-600', icon: Target };
-        if (stats.completionRate >= 50) return { level: 'Average', color: 'text-yellow-600', icon: AlertCircle };
+        const scorePercentage = stats.scorePercentage || 0;
+        if (scorePercentage >= 80) return { level: 'Excellent', color: 'text-green-600', icon: Trophy };
+        if (scorePercentage >= 60) return { level: 'Good', color: 'text-blue-600', icon: Target };
+        if (scorePercentage >= 40) return { level: 'Average', color: 'text-yellow-600', icon: AlertCircle };
         return { level: 'Needs Improvement', color: 'text-red-600', icon: XCircle };
     };
 
@@ -121,22 +149,26 @@ function InterviewResults() {
                         </div>
                     </div>
                     
-                    <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-                        <div className='text-center p-4 bg-blue-50 rounded-lg'>
-                            <div className='text-2xl font-bold text-blue-600'>{stats.completionRate}%</div>
-                            <div className='text-sm text-gray-600'>Completion Rate</div>
-                        </div>
+                    <div className='grid grid-cols-2 md:grid-cols-5 gap-4'>
                         <div className='text-center p-4 bg-green-50 rounded-lg'>
-                            <div className='text-2xl font-bold text-green-600'>{stats.answeredQuestions}</div>
-                            <div className='text-sm text-gray-600'>Questions Answered</div>
+                            <div className='text-2xl font-bold text-green-600'>{stats.scorePercentage}%</div>
+                            <div className='text-sm text-gray-600'>Overall Score</div>
+                        </div>
+                        <div className='text-center p-4 bg-blue-50 rounded-lg'>
+                            <div className='text-2xl font-bold text-blue-600'>{stats.totalScore}/{stats.maxPossibleScore}</div>
+                            <div className='text-sm text-gray-600'>Points Earned</div>
+                        </div>
+                        <div className='text-center p-4 bg-purple-50 rounded-lg'>
+                            <div className='text-2xl font-bold text-purple-600'>{stats.avgScore}</div>
+                            <div className='text-sm text-gray-600'>Avg Score/Question</div>
                         </div>
                         <div className='text-center p-4 bg-yellow-50 rounded-lg'>
                             <div className='text-2xl font-bold text-yellow-600'>{formatTime(stats.avgTime)}</div>
                             <div className='text-sm text-gray-600'>Avg Response Time</div>
                         </div>
-                        <div className='text-center p-4 bg-purple-50 rounded-lg'>
-                            <div className='text-2xl font-bold text-purple-600'>{stats.quickResponses}</div>
-                            <div className='text-sm text-gray-600'>Quick Responses</div>
+                        <div className='text-center p-4 bg-orange-50 rounded-lg'>
+                            <div className='text-2xl font-bold text-orange-600'>{stats.answeredQuestions}/{stats.totalQuestions}</div>
+                            <div className='text-sm text-gray-600'>Questions Answered</div>
                         </div>
                     </div>
                 </div>
@@ -171,6 +203,14 @@ function InterviewResults() {
                                         Question {index + 1}: {answer.question}
                                     </h4>
                                     <div className='flex items-center gap-2'>
+                                        <div className={`text-lg font-bold px-3 py-1 rounded ${
+                                            (answer.score || 0) >= 8 ? 'bg-green-100 text-green-700' :
+                                            (answer.score || 0) >= 6 ? 'bg-blue-100 text-blue-700' :
+                                            (answer.score || 0) >= 4 ? 'bg-yellow-100 text-yellow-700' :
+                                            'bg-red-100 text-red-700'
+                                        }`}>
+                                            {answer.score || 0}/10
+                                        </div>
                                         <Clock className='h-4 w-4 text-gray-500'/>
                                         <span className='text-sm text-gray-600'>
                                             {formatTime(answer.timeTaken)}

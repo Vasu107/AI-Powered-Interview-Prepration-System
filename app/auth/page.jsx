@@ -76,88 +76,92 @@ function Login() {
   }
 
   return (
-    <div className='flex flex-col justify-center items-center h-screen'>
-      <div className='flex flex-col items-center border rounded-2xl p-8'>
+    <div className='flex flex-col justify-center items-center min-h-screen p-4 sm:p-6 lg:p-8'>
+      <div className='flex flex-col items-center border rounded-2xl p-4 sm:p-6 lg:p-8 w-full max-w-md mx-auto bg-white shadow-lg'>
         <Image 
           src='/logo.png' 
           alt='Logo' 
           width={400} 
           height={100}
-          className='w-[180px]'
+          className='w-32 sm:w-40 lg:w-[180px] mb-4'
         />
-          <h2 className='text-2xl font-bold text-center'>Welcome to AskUp Virtual Interview</h2>
-          <p className='text-gray-500 text-center'>{isRegister ? 'Create your account' : 'Sign in to your account'}</p>
-          
-          {/* Email/Password Form */}
-          <form onSubmit={isRegister ? registerUser : signInWithEmail} className='w-full space-y-4 mt-6'>
-            {isRegister && (
-              <div>
-                <Input
-                  type='text'
-                  placeholder='Full Name'
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-            )}
+        <h2 className='text-lg sm:text-xl lg:text-2xl font-bold text-center mb-2'>Welcome to AskUp Virtual Interview</h2>
+        <p className='text-sm sm:text-base text-gray-500 text-center mb-6'>{isRegister ? 'Create your account' : 'Sign in to your account'}</p>
+        
+        {/* Email/Password Form */}
+        <form onSubmit={isRegister ? registerUser : signInWithEmail} className='w-full space-y-3 sm:space-y-4'>
+          {isRegister && (
             <div>
               <Input
-                type='email'
-                placeholder='Email address'
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type='text'
+                placeholder='Full Name'
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
+                className='h-10 sm:h-11'
               />
             </div>
-            <div>
-              <Input
-                type='password'
-                placeholder='Password'
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button 
-              type='submit'
-              className='w-full'
-              disabled={loading}
-            >
-              {loading ? (isRegister ? 'Creating account...' : 'Signing in...') : (isRegister ? 'Create Account' : 'Sign In')}
-            </Button>
-          </form>
-          
-          <button
-            onClick={() => setIsRegister(!isRegister)}
-            className='text-blue-600 hover:underline mt-4'
-          >
-            {isRegister ? 'Already have an account? Sign in' : 'Need an account? Register'}
-          </button>
-          
-          <div className='flex items-center my-4'>
-            <div className='flex-1 border-t border-gray-300'></div>
-            <span className='px-3 text-gray-500 text-sm'>OR</span>
-            <div className='flex-1 border-t border-gray-300'></div>
+          )}
+          <div>
+            <Input
+              type='email'
+              placeholder='Email address'
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className='h-10 sm:h-11'
+            />
           </div>
-          
+          <div>
+            <Input
+              type='password'
+              placeholder='Password'
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className='h-10 sm:h-11'
+            />
+          </div>
           <Button 
-            className='mt-7 w-full'
-            onClick={signInWithGoogle}
+            type='submit'
+            className='w-full h-10 sm:h-11 text-sm sm:text-base'
+            disabled={loading}
           >
-            Login with Google
+            {loading ? (isRegister ? 'Creating account...' : 'Signing in...') : (isRegister ? 'Create Account' : 'Sign In')}
           </Button>
-          
-          <Button 
-            variant='outline'
-            className='mt-3 w-full'
-            onClick={signInWithGitHub}
-          >
-            Login with GitHub
-          </Button>
-
+        </form>
+        
+        <button
+          onClick={() => setIsRegister(!isRegister)}
+          className='text-blue-600 hover:underline mt-3 sm:mt-4 text-sm sm:text-base'
+        >
+          {isRegister ? 'Already have an account? Sign in' : 'Need an account? Register'}
+        </button>
+        
+        <div className='flex items-center my-4 sm:my-6 w-full'>
+          <div className='flex-1 border-t border-gray-300'></div>
+          <span className='px-3 text-gray-500 text-xs sm:text-sm'>OR</span>
+          <div className='flex-1 border-t border-gray-300'></div>
         </div>
+        
+        <Button 
+          className='w-full h-10 sm:h-11 text-sm sm:text-base mb-3'
+          onClick={signInWithGoogle}
+          disabled={loading}
+        >
+          Login with Google
+        </Button>
+        
+        <Button 
+          variant='outline'
+          className='w-full h-10 sm:h-11 text-sm sm:text-base'
+          onClick={signInWithGitHub}
+          disabled={loading}
+        >
+          Login with GitHub
+        </Button>
       </div>
+    </div>
   )
 }
 

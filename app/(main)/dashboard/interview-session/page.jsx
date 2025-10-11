@@ -14,10 +14,13 @@ function InterviewSession() {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState([]);
     const [currentAnswer, setCurrentAnswer] = useState('');
-    const [questionTimeLeft, setQuestionTimeLeft] = useState(120);
+    const [questionTimeLeft, setQuestionTimeLeft] = useState(10);
+    const [answerTimeLeft, setAnswerTimeLeft] = useState(120);
     const [totalTimeLeft, setTotalTimeLeft] = useState(0);
     const [isTimerActive, setIsTimerActive] = useState(false);
+    const [isAnswerTimerActive, setIsAnswerTimerActive] = useState(false);
     const [hasStartedTyping, setHasStartedTyping] = useState(false);
+    const [timerPhase, setTimerPhase] = useState('waiting'); // 'waiting', 'answering', 'timeout'
     const [isRecording, setIsRecording] = useState(false);
     const [isCameraOn, setIsCameraOn] = useState(false);
     const [cameraLoading, setCameraLoading] = useState(false);
@@ -52,7 +55,9 @@ function InterviewSession() {
             setInterviewData(data);
             const duration = parseInt(data.Duration.replace(' Min', '')) * 60;
             setTotalTimeLeft(duration);
-            setQuestionTimeLeft(120);
+            setQuestionTimeLeft(10);
+            setAnswerTimeLeft(120);
+            setTimerPhase('waiting');
             startCameraAutomatically();
             
             setTimeout(() => {
@@ -250,39 +255,117 @@ function InterviewSession() {
     };
 
     useEffect(() => {
-        if (isTimerActive && questionTimeLeft > 0) {
+        if (isTimerActive && timerPhase === 'waiting' && questionTimeLeft > 0) {
             timerRef.current = setTimeout(() => {
                 setQuestionTimeLeft(prev => prev - 1);
             }, 1000);
-        } else if (questionTimeLeft === 0) {
-            handleTimeUp();
+        } else if (timerPhase === 'waiting' && questionTimeLeft === 0) {
+            // Auto move to next question after 10 seconds
+            handleAutoNext();
         }
+        
+        if (isAnswerTimerActive && timerPhase === 'answering' && answerTimeLeft > 0) {
+            timerRef.current = setTimeout(() => {
+                setAnswerTimeLeft(prev => prev - 1);
+            }, 1000);
+        } else if (timerPhase === 'answering' && answerTimeLeft === 0) {
+            handleAnswerTimeUp();
+        }
+        
         return () => clearTimeout(timerRef.current);
-    }, [isTimerActive, questionTimeLeft]);
+    }, [isTimerActive, isAnswerTimerActive, questionTimeLeft, answerTimeLeft, timerPhase]);
 
     const handleAnswerChange = (value) => {
+        // Limit to 100 words
+        const words = value.trim().split(/\s+/);
+        if (words.length > 100 && value.trim() !== '') {
+            toast.warning("Answer limited to 100 words maximum");
+            return;
+        }
+        
         setCurrentAnswer(value);
-        if (!hasStartedTyping && value.trim()) {
+        if (!hasStartedTyping && value.trim() && timerPhase === 'waiting') {
             setHasStartedTyping(true);
+            startAnswerTimer();
         }
     };
-
-    const handleTimeUp = () => {
+    
+    const getWordCount = (text) => {
+        return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+    };
+    
+    const startAnswerTimer = () => {
+        setTimerPhase('answering');
         setIsTimerActive(false);
-        const timeoutAnswer = currentAnswer || "[TIMEOUT - Answer incomplete]";
+        setIsAnswerTimerActive(true);
+        setAnswerTimeLeft(120); // 2 minutes for answering
+        toast.info("Answer timer started - You have 2 minutes to complete your answer");
+    };
+    
+    const handleAutoNext = () => {
+        setIsTimerActive(false);
+        const timeoutAnswer = "[NO ANSWER - Question skipped after 10 seconds]";
         saveCurrentAnswer(timeoutAnswer, true);
-        toast.error("Time's up! Moving to next question.");
+        toast.warning("No answer provided within 10 seconds. Moving to next question.");
+        setTimeout(() => moveToNextQuestion(), 1500);
+    };
+    
+    const handleAnswerTimeUp = () => {
+        setIsAnswerTimerActive(false);
+        const timeoutAnswer = currentAnswer || "[TIMEOUT - Answer incomplete after 2 minutes]";
+        saveCurrentAnswer(timeoutAnswer, true);
+        toast.error("Answer time limit reached! Moving to next question.");
         setTimeout(() => moveToNextQuestion(), 1500);
     };
 
+    const calculateAnswerScore = (userAnswer, correctAnswer, timedOut) => {
+        // No score for timeout or empty answers
+        if (timedOut || !userAnswer || userAnswer.includes('[NO ANSWER') || userAnswer.includes('[TIMEOUT')) {
+            return 0;
+        }
+        
+        // Simple scoring based on keyword matching and answer quality
+        const userWords = userAnswer.toLowerCase().split(/\s+/);
+        const correctWords = correctAnswer.toLowerCase().split(/\s+/);
+        
+        // Calculate keyword overlap
+        let matchCount = 0;
+        correctWords.forEach(word => {
+            if (word.length > 3 && userWords.some(userWord => userWord.includes(word) || word.includes(userWord))) {
+                matchCount++;
+            }
+        });
+        
+        // Base score from keyword matching (0-7 points)
+        let score = Math.min(7, Math.round((matchCount / correctWords.length) * 7));
+        
+        // Bonus points for answer length and completeness (0-3 points)
+        if (userAnswer.length > 50) score += 1;
+        if (userAnswer.length > 100) score += 1;
+        if (userWords.length >= 20) score += 1;
+        
+        return Math.min(10, Math.max(0, score));
+    };
+
     const saveCurrentAnswer = (answer, timedOut = false) => {
+        // Safety check to ensure question exists
+        if (!interviewData?.questions?.[currentQuestionIndex]) {
+            console.error('Question not found at index:', currentQuestionIndex);
+            return;
+        }
+        
+        const currentQuestion = interviewData.questions[currentQuestionIndex];
+        const timeTaken = timerPhase === 'answering' ? (120 - answerTimeLeft) : (10 - questionTimeLeft);
+        const score = calculateAnswerScore(answer, currentQuestion.correctAnswer || '', timedOut);
+        
         const answerData = {
-            questionId: interviewData.questions[currentQuestionIndex].id,
-            question: interviewData.questions[currentQuestionIndex].question,
+            questionId: currentQuestion.id || currentQuestionIndex,
+            question: currentQuestion.question || 'Question not available',
             userAnswer: answer,
-            correctAnswer: interviewData.questions[currentQuestionIndex].correctAnswer,
-            timeTaken: 120 - questionTimeLeft,
+            correctAnswer: currentQuestion.correctAnswer || 'No correct answer provided',
+            timeTaken: timeTaken,
             timedOut: timedOut,
+            score: score,
             timestamp: new Date().toISOString()
         };
         
@@ -290,13 +373,24 @@ function InterviewSession() {
     };
 
     const moveToNextQuestion = () => {
+        // Turn off microphone if it's on
+        if (isRecording && mediaRecorder) {
+            mediaRecorder.stop();
+            setMediaRecorder(null);
+            setIsRecording(false);
+            toast.info("Microphone turned off for next question");
+        }
+        
         if (currentQuestionIndex < interviewData.questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
-            setCurrentAnswer('');
+            setCurrentAnswer(''); // Clear text area
             setHasStartedTyping(false);
-            setQuestionTimeLeft(120);
+            setQuestionTimeLeft(10);
+            setAnswerTimeLeft(120);
+            setTimerPhase('waiting');
             setAiSpeechComplete(false);
             setIsTimerActive(true);
+            setIsAnswerTimerActive(false);
         } else {
             completeInterview();
         }
@@ -309,11 +403,34 @@ function InterviewSession() {
         }
         
         setIsTimerActive(false);
-        saveCurrentAnswer(currentAnswer);
-        setTimeout(() => moveToNextQuestion(), 100);
+        setIsAnswerTimerActive(false);
+        
+        // Save current answer
+        if (currentAnswer.trim()) {
+            saveCurrentAnswer(currentAnswer);
+        }
+        
+        // Turn off microphone if it's on
+        if (isRecording && mediaRecorder) {
+            mediaRecorder.stop();
+            setMediaRecorder(null);
+            setIsRecording(false);
+        }
+        
+        // Check if this is the last question
+        if (currentQuestionIndex === interviewData.questions.length - 1) {
+            setTimeout(() => completeInterview(), 100);
+        } else {
+            setTimeout(() => moveToNextQuestion(), 100);
+        }
     };
 
     const completeInterview = () => {
+        // Save current answer if exists
+        if (currentAnswer.trim()) {
+            saveCurrentAnswer(currentAnswer);
+        }
+        
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
@@ -324,29 +441,51 @@ function InterviewSession() {
         setIsCameraOn(false);
         toast.success("Interview completed! Camera has been turned off.");
         
-        const finalResults = {
-            ...interviewData,
-            id: Date.now().toString(),
-            answers: answers,
-            emotionHistory: emotionHistory,
-            finalEmotion: currentEmotion,
-            facialMetrics: facialMetrics,
-            completedAt: new Date().toISOString(),
-            createdAt: interviewData.createdAt || new Date().toISOString(),
-            totalQuestions: interviewData.questions.length,
-            answeredQuestions: answers.length
-        };
-        
-        // Store in interview results
-        localStorage.setItem('interviewResults', JSON.stringify(finalResults));
-        
-        // Store in all interviews list
-        const existingInterviews = JSON.parse(localStorage.getItem('allInterviews') || '[]');
-        existingInterviews.push(finalResults);
-        localStorage.setItem('allInterviews', JSON.stringify(existingInterviews));
-        
-        localStorage.removeItem('currentInterview');
-        router.push('/dashboard/interview-results');
+        // Wait for state update then create final results
+        setTimeout(() => {
+            const finalAnswers = currentAnswer.trim() && interviewData?.questions?.[currentQuestionIndex] ? [...answers, {
+                questionId: interviewData.questions[currentQuestionIndex].id || currentQuestionIndex,
+                question: interviewData.questions[currentQuestionIndex].question || 'Question not available',
+                userAnswer: currentAnswer,
+                correctAnswer: interviewData.questions[currentQuestionIndex].correctAnswer || 'No correct answer provided',
+                timeTaken: 120 - questionTimeLeft,
+                timedOut: false,
+                score: calculateAnswerScore(currentAnswer, interviewData.questions[currentQuestionIndex].correctAnswer || '', false),
+                timestamp: new Date().toISOString()
+            }] : answers;
+            
+            // Calculate final score based on points earned
+            const totalPointsEarned = finalAnswers.reduce((sum, answer) => sum + (answer.score || 0), 0);
+            const maxPossiblePoints = interviewData.questions.length * 10;
+            const finalScorePercentage = maxPossiblePoints > 0 ? Math.round((totalPointsEarned / maxPossiblePoints) * 100) : 0;
+            
+            const finalResults = {
+                ...interviewData,
+                id: Date.now().toString(),
+                answers: finalAnswers,
+                emotionHistory: emotionHistory,
+                finalEmotion: currentEmotion,
+                facialMetrics: facialMetrics,
+                completedAt: new Date().toISOString(),
+                createdAt: interviewData.createdAt || new Date().toISOString(),
+                totalQuestions: interviewData.questions.length,
+                answeredQuestions: finalAnswers.length,
+                totalPointsEarned: totalPointsEarned,
+                maxPossiblePoints: maxPossiblePoints,
+                finalScore: finalScorePercentage
+            };
+            
+            // Store in interview results
+            localStorage.setItem('interviewResults', JSON.stringify(finalResults));
+            
+            // Store in all interviews list
+            const existingInterviews = JSON.parse(localStorage.getItem('allInterviews') || '[]');
+            existingInterviews.push(finalResults);
+            localStorage.setItem('allInterviews', JSON.stringify(existingInterviews));
+            
+            localStorage.removeItem('currentInterview');
+            router.push('/dashboard/interview-results');
+        }, 100);
     };
 
     const toggleCamera = async () => {
@@ -410,19 +549,60 @@ function InterviewSession() {
                 
                 recognition.onresult = (event) => {
                     let transcript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                    for (let i = 0; i < event.results.length; i++) {
                         transcript += event.results[i][0].transcript;
                     }
-                    setCurrentAnswer(transcript);
-                    if (!hasStartedTyping && transcript.trim()) {
-                        setHasStartedTyping(true);
+                    
+                    // Check word limit before setting
+                    const words = transcript.trim().split(/\s+/);
+                    if (words.length > 100 && transcript.trim() !== '') {
+                        toast.warning("Voice answer limited to 100 words maximum");
+                        return;
                     }
+                    
+                    setCurrentAnswer(transcript);
+                    // Trigger answer timer when user starts speaking
+                    if (!hasStartedTyping && transcript.trim() && timerPhase === 'waiting') {
+                        setHasStartedTyping(true);
+                        startAnswerTimer();
+                    }
+                };
+                
+                recognition.onstart = () => {
+                    console.log('Speech recognition started');
+                    toast.success("Listening... Start speaking your answer");
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    toast.error(`Speech recognition error: ${event.error}`);
+                };
+                
+                recognition.onspeechstart = () => {
+                    // Start answer timer when user actually starts speaking
+                    if (timerPhase === 'waiting' && !hasStartedTyping) {
+                        setHasStartedTyping(true);
+                        startAnswerTimer();
+                        toast.info("Speech detected - Answer timer started!");
+                    }
+                };
+                
+                recognition.onspeechend = () => {
+                    console.log('Speech ended');
+                };
+                
+                recognition.onend = () => {
+                    console.log('Speech recognition ended');
+                    // Don't auto-restart recognition to avoid infinite loop
+                    setIsRecording(false);
+                    setMediaRecorder(null);
+                    toast.info("Voice recording stopped");
                 };
                 
                 recognition.start();
                 setMediaRecorder(recognition);
                 setIsRecording(true);
-                toast.success("Voice recording started - Speak your answer");
+                toast.success("Voice recording started - Timer will pause");
             } catch (error) {
                 toast.error("Speech recognition not supported");
             }
@@ -464,58 +644,70 @@ function InterviewSession() {
     return (
         <div className='min-h-screen bg-gray-50 flex flex-col'>
             {/* Header */}
-            <div className='bg-white shadow-lg p-4 border-b-2 border-blue-200 flex-shrink-0'>
-                <div className='max-w-6xl mx-auto'>
-                    <div className='flex items-center gap-4 mb-3'>
+            <div className='bg-white shadow-lg p-3 sm:p-4 lg:p-5 border-b-2 border-blue-200 flex-shrink-0'>
+                <div className='max-w-7xl mx-auto'>
+                    <div className='flex items-center gap-2 sm:gap-3 lg:gap-4 mb-3 sm:mb-4'>
                         <ArrowLeft 
                             onClick={() => router.back()} 
-                            className='cursor-pointer h-5 w-5 text-gray-700 hover:text-blue-600'
+                            className='cursor-pointer h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-gray-700 hover:text-blue-600 transition-colors'
                         />
-                        <div>
-                            <h1 className='text-2xl font-bold text-gray-800'>AI Interview Session</h1>
-                            <p className='text-sm text-blue-600 font-medium'>
+                        <div className='flex-1 min-w-0'>
+                            <h1 className='text-base sm:text-lg lg:text-2xl xl:text-3xl font-bold text-gray-800 truncate'>AI Interview Session</h1>
+                            <p className='text-xs sm:text-sm lg:text-base text-blue-600 font-medium truncate'>
                                 Position: {interviewData?.jobPosition || 'Not specified'}
                             </p>
                         </div>
                     </div>
                     
-                    <div className='flex justify-between items-center'>
-                        <div className='flex items-center gap-4'>
-                            <div className='flex items-center gap-2'>
-                                <Clock className='h-4 w-4 text-gray-600'/>
-                                <span className='text-xs text-gray-600'>Time:</span>
-                                <span className={`font-mono text-lg font-bold ${questionTimeLeft < 30 ? 'text-red-500' : 'text-green-600'}`}>
-                                    {Math.floor(questionTimeLeft / 60)}:{(questionTimeLeft % 60).toString().padStart(2, '0')}
+                    <div className='flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-4'>
+                        <div className='flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 lg:gap-4 flex-1'>
+                            <div className='flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg'>
+                                <Clock className='h-3 w-3 sm:h-4 sm:w-4 text-gray-600 flex-shrink-0'/>
+                                <span className='text-xs sm:text-sm text-gray-600'>Time:</span>
+                                <span className={`font-mono text-sm sm:text-base lg:text-lg font-bold ${
+                                    timerPhase === 'waiting' ? 
+                                        (questionTimeLeft < 5 ? 'text-red-500' : 'text-orange-500') :
+                                        (answerTimeLeft < 30 ? 'text-red-500' : 'text-green-600')
+                                }`}>
+                                    {timerPhase === 'waiting' ? 
+                                        `${questionTimeLeft}s` :
+                                        `${Math.floor(answerTimeLeft / 60)}:${(answerTimeLeft % 60).toString().padStart(2, '0')}`
+                                    }
+                                </span>
+                                <span className='text-xs text-gray-500 ml-1'>
+                                    {timerPhase === 'waiting' ? '(to start)' : '(to answer)'}
                                 </span>
                             </div>
-                            <div className='text-sm font-semibold text-gray-700'>
+                            <div className='text-xs sm:text-sm lg:text-base font-semibold text-gray-700 bg-blue-50 px-3 py-2 rounded-lg'>
                                 Question {currentQuestionIndex + 1} of {interviewData.questions.length}
                             </div>
                         </div>
                         
-                        <div className='flex gap-3'>
+                        <div className='flex gap-2 sm:gap-3 flex-shrink-0'>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={toggleCamera}
                                 disabled={cameraLoading}
-                                className={isCameraOn ? 'bg-green-100 border-green-300' : ''}
+                                className={`${isCameraOn ? 'bg-green-100 border-green-300 text-green-700' : 'hover:bg-gray-50'} p-2 sm:p-3 h-8 w-8 sm:h-9 sm:w-9`}
+                                title={isCameraOn ? 'Camera On' : 'Camera Off'}
                             >
                                 {cameraLoading ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-gray-600"></div>
                                 ) : isCameraOn ? (
-                                    <Camera className='h-4 w-4'/>
+                                    <Camera className='h-3 w-3 sm:h-4 sm:w-4'/>
                                 ) : (
-                                    <CameraOff className='h-4 w-4'/>
+                                    <CameraOff className='h-3 w-3 sm:h-4 sm:w-4'/>
                                 )}
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={toggleRecording}
-                                className={isRecording ? 'bg-red-100 border-red-300' : ''}
+                                className={`${isRecording ? 'bg-red-100 border-red-300 text-red-700' : 'hover:bg-gray-50'} p-2 sm:p-3 h-8 w-8 sm:h-9 sm:w-9`}
+                                title={isRecording ? 'Recording' : 'Not Recording'}
                             >
-                                {isRecording ? <Mic className='h-4 w-4'/> : <MicOff className='h-4 w-4'/>}
+                                {isRecording ? <Mic className='h-3 w-3 sm:h-4 sm:w-4'/> : <MicOff className='h-3 w-3 sm:h-4 sm:w-4'/>}
                             </Button>
                         </div>
                     </div>
@@ -525,14 +717,14 @@ function InterviewSession() {
             </div>
 
             {/* Main Interview Layout */}
-            <div className='flex flex-1 bg-white'>
+            <div className='flex flex-col lg:flex-row flex-1 bg-white'>
                 {/* Left Side - User Camera */}
-                <div className='w-1/2 border-r-2 border-gray-200 p-4 flex flex-col'>
-                    <h2 className='text-lg font-semibold text-gray-800 mb-3'>Your Video</h2>
+                <div className='w-full lg:w-1/2 border-b-2 lg:border-b-0 lg:border-r-2 border-gray-200 p-3 sm:p-4 flex flex-col min-h-[300px] lg:min-h-0'>
+                    <h2 className='text-base sm:text-lg font-semibold text-gray-800 mb-2 sm:mb-3'>Your Video</h2>
                     
                     <div className='flex items-center justify-center flex-1'>
                         {isCameraOn ? (
-                            <div className='relative w-full max-w-lg aspect-video bg-black rounded-xl overflow-hidden shadow-lg'>
+                            <div className='relative w-full max-w-sm sm:max-w-lg aspect-video bg-black rounded-xl overflow-hidden shadow-lg'>
                                 <video
                                     ref={videoRef}
                                     autoPlay
@@ -540,11 +732,11 @@ function InterviewSession() {
                                     className='w-full h-full object-cover'
                                 />
                                 <canvas ref={canvasRef} className='hidden' />
-                                <div className='absolute top-3 right-3 bg-red-500 w-4 h-4 rounded-full animate-pulse'></div>
+                                <div className='absolute top-2 sm:top-3 right-2 sm:right-3 bg-red-500 w-3 h-3 sm:w-4 sm:h-4 rounded-full animate-pulse'></div>
                                 
-                                <div className='absolute bottom-3 left-3 bg-black bg-opacity-80 text-white px-3 py-2 rounded-lg text-sm'>
-                                    <div className='flex items-center gap-2 mb-1'>
-                                        <div className={`w-3 h-3 rounded-full ${
+                                <div className='absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-black bg-opacity-80 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm'>
+                                    <div className='flex items-center gap-1 sm:gap-2'>
+                                        <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
                                             currentEmotion === 'Happy' ? 'bg-green-400' :
                                             currentEmotion === 'Sad' ? 'bg-blue-400' :
                                             currentEmotion === 'Angry' ? 'bg-red-400' :
@@ -556,11 +748,11 @@ function InterviewSession() {
                                 </div>
                             </div>
                         ) : (
-                            <div className='w-full max-w-lg aspect-video bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center'>
+                            <div className='w-full max-w-sm sm:max-w-lg aspect-video bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center'>
                                 <div className='text-center text-gray-500'>
-                                    <CameraOff className='h-16 w-16 mx-auto mb-3' />
-                                    <p className='text-lg font-medium'>Camera is off</p>
-                                    <p className='text-sm'>Enable camera to start monitoring</p>
+                                    <CameraOff className='h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-2 sm:mb-3' />
+                                    <p className='text-base sm:text-lg font-medium'>Camera is off</p>
+                                    <p className='text-xs sm:text-sm'>Enable camera to start monitoring</p>
                                 </div>
                             </div>
                         )}
@@ -568,7 +760,7 @@ function InterviewSession() {
                 </div>
 
                 {/* Right Side - AI Avatar */}
-                <div className='w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100'>
+                <div className='w-full lg:w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-[300px] lg:min-h-0'>
                     <div className='h-full'>
                         <AIAvatar 
                             currentQuestion={currentQuestion?.question}
@@ -580,52 +772,74 @@ function InterviewSession() {
             </div>
 
             {/* Bottom Panel - Answer Input */}
-            <div className='bg-gray-50 border-t-4 border-blue-300 p-4 min-h-[200px] flex flex-col'>
-                <div className='max-w-6xl mx-auto flex-1 flex flex-col'>
-                    <div className='mb-3'>
-                        <h3 className='text-lg font-bold text-gray-800 mb-1'>{currentQuestion?.question}</h3>
-                        <div className='flex justify-between items-center text-xs text-gray-600'>
-                            <span className='font-medium'>Progress: {currentQuestionIndex + 1}/{interviewData.questions.length}</span>
-                            <span className='text-blue-600 font-medium'>⏰ 2 minutes per question</span>
+            <div className='bg-gray-50 border-t-4 border-blue-300 p-3 sm:p-4 lg:p-5 min-h-[200px] sm:min-h-[220px] lg:min-h-[240px] flex flex-col'>
+                <div className='max-w-7xl mx-auto flex-1 flex flex-col'>
+                    <div className='mb-3 sm:mb-4'>
+                        <h3 className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold text-gray-800 mb-2 leading-tight'>{currentQuestion?.question}</h3>
+                        <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs sm:text-sm text-gray-600 gap-1 sm:gap-2'>
+                            <span className='font-medium bg-white px-2 py-1 rounded'>Progress: {currentQuestionIndex + 1}/{interviewData.questions.length}</span>
+                            <span className='text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded'>⏰ 2 minutes per question</span>
                         </div>
                     </div>
                     
-                    <div className='flex gap-3 items-start'>
-                        <Textarea
-                            placeholder="Please provide a detailed answer to the interview question."
-                            value={currentAnswer}
-                            onChange={(e) => handleAnswerChange(e.target.value)}
-                            className='flex-1 h-20 w-3xl text-sm border-2 border-gray-300 focus:border-blue-500 rounded-lg p-3 resize-none'
-                            disabled={questionTimeLeft === 0}
-                        />
-                        <Button 
-                            onClick={handleNextQuestion}
-                            disabled={questionTimeLeft === 0}
-                            className='px-6 py-2 h-20 text-base bg-blue-600 hover:bg-blue-700 font-semibold flex items-center gap-2'
-                        >
-                            {currentQuestionIndex === interviewData.questions.length - 1 ? 'Complete' : 'Next'}
-                            <ChevronRight className='h-4 w-4'/>
-                        </Button>
+                    <div className='flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch'>
+                        <div className='flex-1 relative'>
+                            <Textarea
+                                placeholder={timerPhase === 'waiting' ? "Start typing to begin 2-minute answer timer... (Max 100 words)" : "Type your detailed answer here... (Max 100 words)"}
+                                value={currentAnswer}
+                                onChange={(e) => handleAnswerChange(e.target.value)}
+                                className='h-[100px] w-full text-base border-2 border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 rounded-lg p-4 resize-none transition-all duration-200 shadow-sm hover:shadow-md'
+                                disabled={false}
+                                maxLength={800}
+                            />
+                            <div className='absolute bottom-2 right-2 text-xs bg-white px-2 py-1 rounded border'>
+                                <span className={`${getWordCount(currentAnswer) > 90 ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
+                                    {getWordCount(currentAnswer)}/100 words
+                                </span>
+                            </div>
+                        </div>
+                        <div className='flex flex-col sm:flex-row xl:flex-col gap-2 xl:w-auto'>
+                            <Button 
+                                onClick={handleNextQuestion}
+                                disabled={false}
+                                className='px-4 sm:px-6 lg:px-8 xl:px-6 py-3 sm:py-4 h-12 sm:h-14 lg:h-16 xl:h-12 text-sm sm:text-base lg:text-lg xl:text-base bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold flex items-center justify-center gap-2 w-full xl:w-auto min-w-[120px] sm:min-w-[140px] xl:min-w-[120px] transition-all duration-200 shadow-md hover:shadow-lg'
+                            >
+                                <span>{currentQuestionIndex === interviewData.questions.length - 1 ? 'Complete Interview' : 'Next Question'}</span>
+                                <ChevronRight className='h-4 w-4 sm:h-5 sm:w-5 xl:h-4 xl:w-4'/>
+                            </Button>
+                            <div className='text-xs sm:text-sm text-gray-500 text-center xl:text-left mt-1 xl:mt-2'>
+                                {timerPhase === 'waiting' ? 
+                                    (questionTimeLeft > 0 ? `${questionTimeLeft}s to start answering` : 'Auto-moving to next...') :
+                                    (answerTimeLeft > 0 ? `${Math.floor(answerTimeLeft / 60)}:${(answerTimeLeft % 60).toString().padStart(2, '0')} remaining` : 'Answer time up!')
+                                }
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Camera Warning Modal */}
             {showCameraWarning && (
-                <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-                    <div className='bg-white rounded-lg p-6 max-w-md mx-4'>
-                        <div className='flex items-center gap-3 mb-4'>
-                            <AlertTriangle className='h-6 w-6 text-red-500'/>
-                            <h3 className='text-lg font-semibold'>Disable Camera?</h3>
+                <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+                    <div className='bg-white rounded-lg p-4 sm:p-6 max-w-sm sm:max-w-md w-full mx-4 shadow-xl'>
+                        <div className='flex items-center gap-3 mb-3 sm:mb-4'>
+                            <AlertTriangle className='h-5 w-5 sm:h-6 sm:w-6 text-red-500 flex-shrink-0'/>
+                            <h3 className='text-base sm:text-lg font-semibold text-gray-800'>Disable Camera?</h3>
                         </div>
-                        <p className='text-gray-600 mb-6'>
+                        <p className='text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 leading-relaxed'>
                             Disabling the camera will stop interview monitoring. This may affect your interview evaluation.
                         </p>
-                        <div className='flex gap-3 justify-end'>
-                            <Button variant="outline" onClick={cancelCameraClose}>
+                        <div className='flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end'>
+                            <Button 
+                                onClick={cancelCameraClose}
+                                className='w-full sm:w-auto text-sm sm:text-base bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90'
+                            >
                                 Keep Camera On
                             </Button>
-                            <Button variant="destructive" onClick={confirmCameraClose}>
+                            <Button 
+                                onClick={confirmCameraClose}
+                                className='w-full sm:w-auto text-sm sm:text-base bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90'
+                            >
                                 Disable Camera
                             </Button>
                         </div>
@@ -635,42 +849,41 @@ function InterviewSession() {
 
             {/* Movement Warning */}
             {showMovementWarning && (
-                <div className='fixed top-20 right-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg shadow-lg z-40'>
+                <div className='fixed top-16 sm:top-20 right-2 sm:right-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg z-40 max-w-xs sm:max-w-sm'>
                     <div className='flex items-center gap-2'>
-                        <AlertTriangle className='h-5 w-5'/>
-                        <span className='font-medium'>Movement Detected!</span>
+                        <AlertTriangle className='h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0'/>
+                        <span className='font-medium text-sm sm:text-base'>Movement Detected!</span>
                     </div>
-                    <p className='text-sm mt-1'>Please remain still during the interview.</p>
+                    <p className='text-xs sm:text-sm mt-1'>Please remain still during the interview.</p>
                 </div>
             )}
 
             {/* Multiple Person Warning */}
             {showMultiplePersonWarning && (
-                <div className='fixed top-36 right-4 bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded-lg shadow-lg z-40'>
+                <div className='fixed top-32 sm:top-36 right-2 sm:right-4 bg-red-100 border border-red-400 text-red-800 px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg z-40 max-w-xs sm:max-w-sm'>
                     <div className='flex items-center gap-2'>
-                        <AlertTriangle className='h-5 w-5'/>
-                        <span className='font-medium'>Multiple Faces Detected!</span>
+                        <AlertTriangle className='h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0'/>
+                        <span className='font-medium text-sm sm:text-base'>Multiple Faces Detected!</span>
                     </div>
-                    <p className='text-sm mt-1'>Only one person should be visible during the interview.</p>
+                    <p className='text-xs sm:text-sm mt-1'>Only one person should be visible during the interview.</p>
                 </div>
             )}
 
             {/* Tab Switch Warning */}
             {showTabSwitchWarning && (
-                <div className='fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-3 z-50 shadow-lg'>
-                    <div className='flex items-center justify-between max-w-7xl mx-auto'>
-                        <div className='flex items-center gap-3'>
-                            <AlertTriangle className='h-5 w-5'/>
-                            <div>
-                                <span className='font-semibold'>Tab Switch Detected!</span>
-                                <span className='ml-2 text-sm'>Please stay on this interview tab. Switching tabs is not allowed during the interview.</span>
+                <div className='fixed top-0 left-0 right-0 bg-orange-500 text-white px-3 sm:px-4 py-2 sm:py-3 z-50 shadow-lg'>
+                    <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-3'>
+                        <div className='flex items-start sm:items-center gap-2 sm:gap-3 flex-1'>
+                            <AlertTriangle className='h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 mt-0.5 sm:mt-0'/>
+                            <div className='min-w-0'>
+                                <span className='font-semibold text-sm sm:text-base block'>Tab Switch Detected!</span>
+                                <span className='text-xs sm:text-sm block sm:inline sm:ml-2'>Please stay on this interview tab. Switching tabs is not allowed during the interview.</span>
                             </div>
                         </div>
                         <Button 
-                            variant="outline" 
                             size="sm" 
                             onClick={() => setShowTabSwitchWarning(false)}
-                            className='bg-white text-orange-500 hover:bg-gray-100'
+                            className='bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 flex-shrink-0'
                         >
                             Understood
                         </Button>

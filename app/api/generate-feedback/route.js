@@ -32,19 +32,35 @@ function generateFeedback(answers, jobPosition, language) {
         answers.reduce((sum, a) => sum + a.timeTaken, 0) / answers.length : 0;
     const quickResponses = answers.filter(a => a.timeTaken < 30 && !a.timedOut).length;
     
+    // Calculate comprehensive scoring metrics
+    const totalScore = answers.reduce((sum, a) => sum + (a.score || 0), 0);
+    const maxPossibleScore = totalQuestions * 10;
+    const scorePercentage = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
+    const avgScorePerQuestion = totalQuestions > 0 ? totalScore / totalQuestions : 0;
     const completionRate = (answeredQuestions / totalQuestions) * 100;
     
-    // Generate overall assessment
-    let overallAssessment = '';
-    if (completionRate >= 90) {
-        overallAssessment = `Excellent performance! You demonstrated strong ${language} knowledge and completed ${completionRate.toFixed(0)}% of the interview questions. Your responses show good understanding of the concepts.`;
-    } else if (completionRate >= 70) {
-        overallAssessment = `Good performance overall. You completed ${completionRate.toFixed(0)}% of the questions with reasonable accuracy. There's room for improvement in some areas.`;
-    } else if (completionRate >= 50) {
-        overallAssessment = `Average performance. You completed ${completionRate.toFixed(0)}% of the questions. Focus on improving your ${language} fundamentals and practice more technical concepts.`;
+    // Analyze score distribution
+    const excellentAnswers = answers.filter(a => (a.score || 0) >= 8).length;
+    const goodAnswers = answers.filter(a => (a.score || 0) >= 6 && (a.score || 0) < 8).length;
+    const averageAnswers = answers.filter(a => (a.score || 0) >= 4 && (a.score || 0) < 6).length;
+    const poorAnswers = answers.filter(a => (a.score || 0) < 4).length;
+    
+    // Generate comprehensive overall assessment
+    let overallAssessment = `Interview Performance Analysis:\n\n`;
+    overallAssessment += `You scored ${totalScore} out of ${maxPossibleScore} points (${scorePercentage.toFixed(1)}%) across ${totalQuestions} questions. `;
+    overallAssessment += `Your average score per question was ${avgScorePerQuestion.toFixed(1)}/10.\n\n`;
+    
+    if (scorePercentage >= 80) {
+        overallAssessment += `Outstanding performance! You demonstrated excellent ${language} knowledge with strong technical understanding. `;
+    } else if (scorePercentage >= 65) {
+        overallAssessment += `Good performance overall. You showed solid ${language} fundamentals with room for refinement in some areas. `;
+    } else if (scorePercentage >= 50) {
+        overallAssessment += `Average performance. You have basic ${language} knowledge but need to strengthen your technical skills. `;
     } else {
-        overallAssessment = `Your performance indicates significant room for improvement. Consider reviewing ${language} basics and practicing more before your next interview.`;
+        overallAssessment += `Below average performance. Focus on building stronger ${language} fundamentals before your next interview. `;
     }
+    
+    overallAssessment += `Score breakdown: ${excellentAnswers} excellent (8-10), ${goodAnswers} good (6-7), ${averageAnswers} average (4-5), ${poorAnswers} needs improvement (0-3).`;
 
     // Generate strengths
     const strengths = [];
@@ -93,11 +109,19 @@ function generateFeedback(answers, jobPosition, language) {
         recommendations.push('Practice timed coding sessions to improve speed');
     }
 
-    // Calculate score
-    let score = Math.round((completionRate / 100) * 10);
-    if (avgTime < 45) score += 1;
-    if (timedOutQuestions === 0) score += 1;
-    score = Math.min(10, Math.max(1, score));
+    // Calculate comprehensive overall score (0-10)
+    let score = Math.round(scorePercentage / 10); // Base score from percentage
+    
+    // Bonus adjustments
+    if (avgTime < 45 && timedOutQuestions === 0) score += 0.5; // Time efficiency bonus
+    if (excellentAnswers > totalQuestions * 0.5) score += 0.5; // Excellence bonus
+    if (completionRate === 100) score += 0.5; // Completion bonus
+    
+    // Penalty adjustments
+    if (timedOutQuestions > totalQuestions * 0.3) score -= 1; // Timeout penalty
+    if (poorAnswers > totalQuestions * 0.5) score -= 0.5; // Poor performance penalty
+    
+    score = Math.min(10, Math.max(0, Math.round(score * 10) / 10));
 
     return {
         overallAssessment,
@@ -108,6 +132,16 @@ function generateFeedback(answers, jobPosition, language) {
         completionRate: Math.round(completionRate),
         avgResponseTime: Math.round(avgTime),
         questionsAnswered: answeredQuestions,
-        totalQuestions
+        totalQuestions,
+        totalScore,
+        maxPossibleScore,
+        scorePercentage: Math.round(scorePercentage * 10) / 10,
+        avgScorePerQuestion: Math.round(avgScorePerQuestion * 10) / 10,
+        scoreDistribution: {
+            excellent: excellentAnswers,
+            good: goodAnswers,
+            average: averageAnswers,
+            poor: poorAnswers
+        }
     };
 }

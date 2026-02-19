@@ -49,16 +49,8 @@ export default function About() {
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <div className="grid grid-cols-2 gap-6 text-center">
                 <div>
-                  <div className="text-3xl font-bold text-blue-600 mb-2">10K+</div>
-                  <div className="text-gray-600">Users Trained</div>
-                </div>
-                <div>
                   <div className="text-3xl font-bold text-green-600 mb-2">95%</div>
                   <div className="text-gray-600">Success Rate</div>
-                </div>
-                <div>
-                  <div className="text-3xl font-bold text-purple-600 mb-2">50+</div>
-                  <div className="text-gray-600">Companies</div>
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-orange-600 mb-2">24/7</div>

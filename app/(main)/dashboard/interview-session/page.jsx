@@ -55,7 +55,7 @@ function InterviewSession() {
             setInterviewData(data);
             const duration = parseInt(data.Duration.replace(' Min', '')) * 60;
             setTotalTimeLeft(duration);
-            setQuestionTimeLeft(10);
+            setQuestionTimeLeft(20);
             setAnswerTimeLeft(120);
             setTimerPhase('waiting');
             startCameraAutomatically();
@@ -260,7 +260,7 @@ function InterviewSession() {
                 setQuestionTimeLeft(prev => prev - 1);
             }, 1000);
         } else if (timerPhase === 'waiting' && questionTimeLeft === 0) {
-            // Auto move to next question after 10 seconds
+            // Auto move to next question after 20 seconds
             handleAutoNext();
         }
         
@@ -304,9 +304,9 @@ function InterviewSession() {
     
     const handleAutoNext = () => {
         setIsTimerActive(false);
-        const timeoutAnswer = "[NO ANSWER - Question skipped after 10 seconds]";
+        const timeoutAnswer = "[NO ANSWER - Question skipped after 20 seconds]";
         saveCurrentAnswer(timeoutAnswer, true);
-        toast.warning("No answer provided within 10 seconds. Moving to next question.");
+        toast.warning("No answer provided within 20 seconds. Moving to next question.");
         setTimeout(() => moveToNextQuestion(), 1500);
     };
     
@@ -355,7 +355,7 @@ function InterviewSession() {
         }
         
         const currentQuestion = interviewData.questions[currentQuestionIndex];
-        const timeTaken = timerPhase === 'answering' ? (120 - answerTimeLeft) : (10 - questionTimeLeft);
+        const timeTaken = timerPhase === 'answering' ? (120 - answerTimeLeft) : (20 - questionTimeLeft);
         const score = calculateAnswerScore(answer, currentQuestion.correctAnswer || '', timedOut);
         
         const answerData = {
@@ -385,7 +385,7 @@ function InterviewSession() {
             setCurrentQuestionIndex(prev => prev + 1);
             setCurrentAnswer(''); // Clear text area
             setHasStartedTyping(false);
-            setQuestionTimeLeft(10);
+            setQuestionTimeLeft(20);
             setAnswerTimeLeft(120);
             setTimerPhase('waiting');
             setAiSpeechComplete(false);
@@ -719,12 +719,14 @@ function InterviewSession() {
             {/* Main Interview Layout */}
             <div className='flex flex-col lg:flex-row flex-1 bg-white'>
                 {/* Left Side - User Camera */}
-                <div className='w-full lg:w-1/2 border-b-2 lg:border-b-0 lg:border-r-2 border-gray-200 p-3 sm:p-4 flex flex-col min-h-[300px] lg:min-h-0'>
+                <div className='w-full lg:w-1/2 border-b-2 lg:border-b-0 lg:border-r-2 border-gray-200 p-3 
+                sm:p-4 flex flex-col min-h-[300px] lg:min-h-0'>
                     <h2 className='text-base sm:text-lg font-semibold text-gray-800 mb-2 sm:mb-3'>Your Video</h2>
                     
                     <div className='flex items-center justify-center flex-1'>
                         {isCameraOn ? (
-                            <div className='relative w-full max-w-sm sm:max-w-lg aspect-video bg-black rounded-xl overflow-hidden shadow-lg'>
+                            <div className='relative w-full max-w-sm sm:max-w-lg aspect-video bg-black rounded-xl 
+                            overflow-hidden shadow-lg'>
                                 <video
                                     ref={videoRef}
                                     autoPlay
@@ -732,9 +734,11 @@ function InterviewSession() {
                                     className='w-full h-full object-cover'
                                 />
                                 <canvas ref={canvasRef} className='hidden' />
-                                <div className='absolute top-2 sm:top-3 right-2 sm:right-3 bg-red-500 w-3 h-3 sm:w-4 sm:h-4 rounded-full animate-pulse'></div>
+                                <div className='absolute top-2 sm:top-3 right-2 sm:right-3 bg-red-500 w-3 h-3 
+                                sm:w-4 sm:h-4 rounded-full animate-pulse'></div>
                                 
-                                <div className='absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-black bg-opacity-80 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm'>
+                                <div className='absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-black bg-opacity-80
+                                 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm'>
                                     <div className='flex items-center gap-1 sm:gap-2'>
                                         <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
                                             currentEmotion === 'Happy' ? 'bg-green-400' :
@@ -760,7 +764,8 @@ function InterviewSession() {
                 </div>
 
                 {/* Right Side - AI Avatar */}
-                <div className='w-full lg:w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-[300px] lg:min-h-0'>
+                <div className='w-full lg:w-1/2 bg-gradient-to-br from-blue-50
+                 to-indigo-100 min-h-[300px] lg:min-h-0'>
                     <div className='h-full'>
                         <AIAvatar 
                             currentQuestion={currentQuestion?.question}
@@ -772,13 +777,18 @@ function InterviewSession() {
             </div>
 
             {/* Bottom Panel - Answer Input */}
-            <div className='bg-gray-50 border-t-4 border-blue-300 p-3 sm:p-4 lg:p-5 min-h-[200px] sm:min-h-[220px] lg:min-h-[240px] flex flex-col'>
+            <div className='bg-gray-50 border-t-4 border-blue-300 p-3 sm:p-4 lg:p-5 min-h-[200px] 
+            sm:min-h-[220px] lg:min-h-[240px] flex flex-col'>
                 <div className='max-w-7xl mx-auto flex-1 flex flex-col'>
                     <div className='mb-3 sm:mb-4'>
-                        <h3 className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold text-gray-800 mb-2 leading-tight'>{currentQuestion?.question}</h3>
-                        <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs sm:text-sm text-gray-600 gap-1 sm:gap-2'>
-                            <span className='font-medium bg-white px-2 py-1 rounded'>Progress: {currentQuestionIndex + 1}/{interviewData.questions.length}</span>
-                            <span className='text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded'>⏰ 2 minutes per question</span>
+                        <h3 className='text-sm sm:text-base lg:text-lg xl:text-xl font-bold text-gray-800 mb-2 
+                        leading-tight'>{currentQuestion?.question}</h3>
+                        <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center 
+                        text-xs sm:text-sm text-gray-600 gap-1 sm:gap-2'>
+                            <span className='font-medium bg-white px-2 py-1 rounded'>Progress: 
+                                {currentQuestionIndex + 1}/{interviewData.questions.length}</span>
+                            <span className='text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded'>
+                                ⏰ 2 minutes per question</span>
                         </div>
                     </div>
                     

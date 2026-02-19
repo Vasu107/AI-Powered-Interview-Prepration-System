@@ -123,6 +123,13 @@ export default function AdminPanel() {
               <p className="text-gray-600">View and manage user accounts</p>
             </div>
           </Link>
+          <Link href="/admin/interviews">
+            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer">
+              <FileText className="w-12 h-12 text-red-600 mb-4" />
+              <h3 className="text-xl font-semibold mb-2">All Interviews</h3>
+              <p className="text-gray-600">View and manage conducted interviews</p>
+            </div>
+          </Link>
           <Link href="/admin/content">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer">
               <FileText className="w-12 h-12 text-green-600 mb-4" />

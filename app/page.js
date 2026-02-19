@@ -93,24 +93,24 @@ export default function Home() {
             <div>
               <h4 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Features</h4>
               <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-300">
-                <li>Mock Interviews</li>
-                <li>Resume Analysis</li>
-                <li>Expression Analysis</li>
+                <li><Link href="/auth" className="hover:text-white">Mock Interviews</Link></li>
+                <li><Link href="/auth" className="hover:text-white">Resume Analysis</Link></li>
+                <li><Link href="/auth" className="hover:text-white">Personalized Feedback</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Company</h4>
               <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-300">
                 <li><Link href="/about" className="hover:text-white">About</Link></li>
-                <li><Link href="/ProgramForYou" className="hover:text-white">Contact</Link></li>
-                <li><Link href="/privacy" className="hover:text-white">Privacy</Link></li>
+                <li><Link href="#" className="hover:text-white">Contact</Link></li>
+                <li><Link href="#" className="hover:text-white">Privacy</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Contact Us</h4>
               <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-300">
-                <li>Email: supports@askup.com</li>
-                <li>Phone: +91 123456789</li>
+                <li>Email: askupteam396@gmail.com</li>
+                <li>Phone: +91 8957273107</li>
                 <li>Address: Buddha Institute Of Technology, GIDA, Gorakhpur</li>
               </ul>
             </div>
@@ -151,12 +151,12 @@ const teamMembers = [
     designation: "UI/UX Designer",
     image: "Anmol.jpeg",
   },
-  {
-    id: 5,
-    name: "Shrinkhala",
-    designation: "Research Analyst",
-    image: "Shrinkhala.jpeg",
-  },
+  // {
+  //   id: 5,
+  //   name: "Shrinkhala",
+  //   designation: "Research Analyst",
+  //   image: "Shrinkhala.jpeg",
+  // },
 ];
 
 function Features() {

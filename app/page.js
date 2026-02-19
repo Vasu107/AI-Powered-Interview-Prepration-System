@@ -151,12 +151,12 @@ const teamMembers = [
     designation: "UI/UX Designer",
     image: "Anmol.jpeg",
   },
-  // {
-  //   id: 5,
-  //   name: "Shrinkhala",
-  //   designation: "Research Analyst",
-  //   image: "Shrinkhala.jpeg",
-  // },
+  {
+    id: 5,
+    name: "Shrinkhala",
+    designation: "Research Analyst",
+    image: "Shrinkhala.jpeg",
+  },
 ];
 
 function Features() {
